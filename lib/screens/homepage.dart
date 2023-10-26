@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:adhan/adhan.dart';
 import 'package:awesome_notifications/awesome_notifications.dart';
+import 'package:faithful_workspace/screens/admin_login_screen.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -272,11 +273,26 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               ListTile(
-                title: const Text('Item 1'),
-                onTap: () {},
+                title:  Row(
+                  children: [
+                    const Icon(Icons.admin_panel_settings, color: Colors.blueAccent,),
+                    const SizedBox(width: 5,),
+                    Text('Admin', style: TextStyle(fontSize: MAX_WIDTH * 0.04, fontWeight: FontWeight.w600),),
+                  ],
+                ),
+                onTap: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminLoginScreen()));
+                },
               ),
+              const Divider(),
               ListTile(
-                title: const Text('Item 2'),
+                title:  Row(
+                  children: [
+                    const Icon(Icons.settings, color: Colors.blueAccent,),
+                    const SizedBox(width: 5,),
+                    Text('Settings', style: TextStyle(fontSize: MAX_WIDTH * 0.04, fontWeight: FontWeight.w600),),
+                  ],
+                ),
                 onTap: () {},
               ),
             ],
