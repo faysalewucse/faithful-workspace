@@ -1,3 +1,4 @@
+import 'package:faithful_workspace/controller/notification_controller.dart';
 import 'package:faithful_workspace/screens/homepage.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -5,6 +6,9 @@ import 'package:google_fonts/google_fonts.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Always initialize Awesome Notifications
+  await NotificationController.initializeLocalNotifications();
   await Firebase.initializeApp();
   runApp(const MyApp());
 }

@@ -1,16 +1,12 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:ffi';
-
 import 'package:adhan/adhan.dart';
+import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:hijri/hijri_calendar.dart';
 import 'package:intl/intl.dart';
-
 import '../widgets/namaj_time_card.dart';
 import '../models/namaj_time_model.dart';
 
@@ -23,12 +19,15 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final DatabaseReference _database = FirebaseDatabase.instance.ref();
-
   IconData notifyIcon = Icons.notifications;
   bool status = false;
   var location = '';
   double latitude = 23.777176;
   double longitude = 90.39945;
+  Map<String, dynamic> namajData = {};
+  late PrayerTimes prayerTimes; // Add this field
+
+  // final myCoordinates = Coordinates(latitude, longitude);
 
   void _determinePosition() async {
     bool serviceEnabled;
@@ -63,11 +62,12 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  Map<String, dynamic> namajData = {};
-
   void fetchData() {
-    NamajTimeModel namajTimeModel;
-    _database.child('namaj').child('time').once().then((DatabaseEvent event) {
+    _database
+        .child('namaj')
+        .child('time')
+        .onValue
+        .listen((DatabaseEvent event) {
       Map<String, dynamic> data = {};
 
       final values = event.snapshot.value as Map;
@@ -77,39 +77,81 @@ class _HomePageState extends State<HomePage> {
 
       setState(() {
         namajData = data;
-        namajTimeModel = NamajTimeModel.fromJson(data);
       });
     });
   }
 
-  @override
-  void initState() {
-    // TODO: implement initState
-    super.initState();
-    Timer.periodic(const Duration(seconds: 1), (timer) {
+  onTimeChange() {
+    Timer.periodic(const Duration(seconds: 1), (timer) async {
+      final currentTime = DateTime.now();
+
+      if ("${reduceTime(namajData[prayerTimes.currentPrayer().name])}:01" ==
+          DateFormat('h:mm:ss').format(currentTime)) {
+        await AwesomeNotifications().createNotification(
+            content: NotificationContent(
+                id: -1,
+                // -1 is replaced by a random number
+                channelKey: 'alerts',
+                title:
+                    "It's ${prayerTimes.nextPrayer().name.toUpperCase()} Time",
+                body: "আসি ভাই নামাজ এর প্রস্তুতি নেই",
+                bigPicture: 'assets/namaj_time_back2.png',
+                // largeIcon: 'https://storage.googleapis.com/cms-storage-bucket/0dbfcc7a59cd1cf16282.png',
+                notificationLayout: NotificationLayout.BigPicture,
+                payload: {'notificationId': '1234567890'}),
+            actionButtons: [
+              NotificationActionButton(
+                  key: 'DISMISS',
+                  label: 'Dismiss',
+                  actionType: ActionType.DismissAction,
+                  isDangerousOption: true)
+            ]);
+      }
       setState(() {});
     });
+  }
+
+  String reduceTime(String inputTime) {
+    print("input Time: $inputTime");
+    if (inputTime.isNotEmpty) {
+      // Parse the input time
+      final DateFormat format = DateFormat('H:mm');
+      DateTime parsedTime = format.parse(inputTime);
+
+      // Subtract 5 minutes
+      parsedTime = parsedTime.subtract(const Duration(minutes: 5));
+
+      // Format the new time as a string
+      String newTime = format.format(parsedTime);
+
+      return newTime;
+    }
+    return "";
+  }
+
+  @override
+  void initState() {
+    super.initState();
     _determinePosition();
     fetchData();
+
+    // Calculate prayer times here and store them in the 'prayerTimes' field
+    final myCoordinates = Coordinates(latitude, longitude);
+    final params = CalculationMethod.karachi.getParameters();
+    params.madhab = Madhab.hanafi;
+    prayerTimes = PrayerTimes.today(myCoordinates, params);
+
+    onTimeChange();
   }
 
   @override
   Widget build(BuildContext context) {
-    var statusBarHeight = MediaQuery.of(context).padding.top;
-    var height = MediaQuery.of(context).size.height -
-        AppBar().preferredSize.height -
-        statusBarHeight;
-    var width = MediaQuery.of(context).size.width;
-    var screen = height * width;
-
-    final myCoordinates = Coordinates(latitude, longitude);
-    final params = CalculationMethod.karachi.getParameters();
-    params.madhab = Madhab.hanafi;
-    final prayerTimes = PrayerTimes.today(myCoordinates, params);
+    var MAX_HEIGHT = MediaQuery.of(context).size.height;
+    var MAX_WIDTH = MediaQuery.of(context).size.width;
 
     getCurrentPrayer(int index) {
       if (index == 2 || index == 0) return 'Fajar';
-      if (index == 3) return 'Zuhor';
+      if (index == 3) return 'Dhuhr';
       if (index == 4) return 'Asr';
       if (index == 5) return 'Maghrib';
       if (index == 6) return 'Isha';
@@ -161,12 +203,12 @@ class _HomePageState extends State<HomePage> {
         int stopHour, int startSecond, int stopSecond) {
       if (startHour > 12 && stopHour < 12) stopHour += 24;
       if (startMinute > stopMinute) {
-        stopMinute += 60;
+        stopMinute += 61;
         --stopHour;
       }
       if (startSecond > stopSecond) {
-        stopSecond += 60;
-        --stopSecond;
+        stopSecond += 61;
+        stopSecond--;
       }
 
       String diffMinute = (stopMinute - startMinute).toString();
@@ -176,13 +218,27 @@ class _HomePageState extends State<HomePage> {
       return [diffHours, diffMinute, diffSeconds];
     }
 
-    DateTime now = DateTime.now();
+    String getTimes(DateTime now, PrayerTimes prayerTimes, int index) {
+      String time = getRemainingTime(
+          now.minute,
+          now.hour,
+          getNextPrayer(prayerTimes.nextPrayer().index)!.minute,
+          getNextPrayer(prayerTimes.nextPrayer().index)!.hour,
+          now.second,
+          getNextPrayer(prayerTimes.nextPrayer().index)!.second)[index];
 
-    double responsiveFontSize = (height * width) / 11000;
+      if (int.parse(time) < 10) {
+        return "0$time";
+      } else {
+        return time;
+      }
+    }
+
+    DateTime now = DateTime.now();
 
     return Scaffold(
         drawer: Drawer(
-          width: width * 0.6,
+          width: MAX_WIDTH * 0.6,
           child: ListView(
             padding: EdgeInsets.zero,
             children: [
@@ -195,20 +251,20 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     Icon(
                       Icons.notifications_active_rounded,
-                      size: responsiveFontSize * 2.5,
+                      size: MAX_WIDTH * 0.1,
                       color: Colors.white,
                     ),
                     Text(
                       'Faithful',
                       style: TextStyle(
-                          fontSize: responsiveFontSize * 1.1,
+                          fontSize: MAX_WIDTH * 0.05,
                           color: Colors.white,
                           fontWeight: FontWeight.bold),
                     ),
                     Text(
                       'Workspace',
                       style: TextStyle(
-                          fontSize: responsiveFontSize / 1.5,
+                          fontSize: MAX_WIDTH * 0.05,
                           color: Colors.white,
                           fontWeight: FontWeight.bold),
                     ),
@@ -269,54 +325,32 @@ class _HomePageState extends State<HomePage> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Column(
-                      children: [
-                        Text(
-                          "${getRemainingTime(now.minute, now.hour, getNextPrayer(prayerTimes.nextPrayer().index)!.minute, getNextPrayer(prayerTimes.nextPrayer().index)!.hour, now.second, getNextPrayer(prayerTimes.nextPrayer().index)!.second)[0]}:",
-                          maxLines: 2,
-                          style: TextStyle(
-                              color: Theme.of(context).primaryColor,
-                              fontSize: responsiveFontSize * 3,
-                              fontWeight: FontWeight.bold),
-                        ),
-                        const Text("Hour"),
-                      ],
+                    Text(
+                      "${getTimes(now, prayerTimes, 0)}:",
+                      maxLines: 2,
+                      style: TextStyle(
+                          color: Theme.of(context).primaryColor,
+                          fontSize: MAX_WIDTH * 0.1,
+                          fontWeight: FontWeight.bold),
                     ),
-                    Column(
-                      children: [
-                        Text(
-                          "${getRemainingTime(now.minute, now.hour, getNextPrayer(prayerTimes.nextPrayer().index)!.minute, getNextPrayer(prayerTimes.nextPrayer().index)!.hour, now.second, getNextPrayer(prayerTimes.nextPrayer().index)!.second)[1]}:",
-                          maxLines: 2,
-                          style: TextStyle(
-                              color: Theme.of(context).primaryColor,
-                              fontSize: responsiveFontSize * 3,
-                              fontWeight: FontWeight.bold),
-                        ),
-                        const Text("Minutes")
-                      ],
+                    Text(
+                      "${getTimes(now, prayerTimes, 1)}:",
+                      maxLines: 2,
+                      style: TextStyle(
+                        color: Theme.of(context).primaryColor,
+                        fontSize: MAX_WIDTH * 0.1,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    Column(
-                      children: [
-                        Text(
-                          getRemainingTime(
-                              now.minute,
-                              now.hour,
-                              getNextPrayer(prayerTimes.nextPrayer().index)!
-                                  .minute,
-                              getNextPrayer(prayerTimes.nextPrayer().index)!
-                                  .hour,
-                              now.second,
-                              getNextPrayer(prayerTimes.nextPrayer().index)!
-                                  .second)[2],
-                          maxLines: 2,
-                          style: TextStyle(
-                              color: Theme.of(context).primaryColor,
-                              fontSize: responsiveFontSize * 3,
-                              fontWeight: FontWeight.bold),
-                        ),
-                        const Text("Seconds")
-                      ],
-                    )
+                    Text(
+                      getTimes(now, prayerTimes, 2),
+                      maxLines: 2,
+                      style: TextStyle(
+                        color: Theme.of(context).primaryColor,
+                        fontSize: MAX_WIDTH * 0.1,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -333,12 +367,12 @@ class _HomePageState extends State<HomePage> {
                     const Text(
                       "NAMAJ",
                       style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold),
+                          color: Colors.white, fontWeight: FontWeight.bold,),
                     ),
                     const Text(
                       "WAKTO",
                       style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold),
+                          color: Colors.white, fontWeight: FontWeight.bold,),
                     ),
                     Container(
                       margin: const EdgeInsets.only(right: 10),
@@ -347,47 +381,47 @@ class _HomePageState extends State<HomePage> {
                         style: TextStyle(
                             color: Colors.white, fontWeight: FontWeight.bold),
                       ),
-                    )
+                    ),
                   ],
                 ),
               ),
               NamajTimeCard(
                   title: 'Fajr',
                   wakto: getCurrentPrayerTime(2)!,
-                  height: height,
+                  height: MAX_HEIGHT,
                   color: Colors.white70,
                   jamat: namajData['fajr'] ?? "",
-                  textSize: responsiveFontSize),
+                  textSize: MAX_WIDTH * 0.05,),
               NamajTimeCard(
-                  title: 'Zuhor',
+                  title: 'Dhuhr',
                   wakto: getCurrentPrayerTime(3)!,
-                  height: height,
+                  height: MAX_HEIGHT,
                   color: Colors.white70,
-                  jamat: namajData['zuhor'] ?? "",
-                  textSize: responsiveFontSize),
+                  jamat: namajData['dhuhr'] ?? "",
+                  textSize: MAX_WIDTH * 0.05,),
               NamajTimeCard(
                   title: 'Asr',
                   wakto: getCurrentPrayerTime(4)!,
-                  height: height,
+                  height: MAX_HEIGHT,
                   color: Colors.white38,
                   jamat: namajData['asr'] ?? "",
-                  textSize: responsiveFontSize),
+                  textSize: MAX_WIDTH * 0.05,),
               NamajTimeCard(
                   title: 'Maghrib',
                   wakto: getCurrentPrayerTime(5)!,
-                  height: height,
+                  height: MAX_HEIGHT,
                   color: Colors.white70,
                   jamat: namajData['maghrib'] ?? "",
-                  textSize: responsiveFontSize),
+                  textSize: MAX_WIDTH * 0.05,),
               NamajTimeCard(
                   title: 'Esha',
                   wakto: getCurrentPrayerTime(6)!,
-                  height: height,
+                  height: MAX_HEIGHT,
                   color: Colors.white38,
                   jamat: namajData['isha'] ?? "",
-                  textSize: responsiveFontSize),
+                  textSize: MAX_WIDTH * 0.05,),
             ],
           ),
-        ));
+        ),);
   }
 }

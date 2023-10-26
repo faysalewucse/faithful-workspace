@@ -2,14 +2,14 @@ class NamajTimeModel {
   String asr;
   String isha;
   String fajr;
-  String zuhor;
+  String dhuhr;
   String maghrib;
 
   NamajTimeModel({
     required this.asr,
     required this.isha,
     required this.fajr,
-    required this.zuhor,
+    required this.dhuhr,
     required this.maghrib,
   });
 
@@ -18,21 +18,18 @@ class NamajTimeModel {
       asr: json['asr'] ?? '',
       isha: json['isha'] ?? '',
       fajr: json['fajr'] ?? '',
-      zuhor: json['zuhor'] ?? '',
+      dhuhr: json['dhuhr'] ?? '',
       maghrib: json['maghrib'] ?? '',
     );
   }
-
 
   Map<String, dynamic> toJson() {
     return {
       "asr": asr,
       "fajr": fajr,
       "isha": isha,
-      "zuhor": zuhor,
+      "dhuhr": dhuhr,
       "maghrib": maghrib,
     };
   }
-
-
 }
