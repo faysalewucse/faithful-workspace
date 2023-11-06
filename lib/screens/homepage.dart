@@ -7,9 +7,9 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:intl/intl.dart';
 import '../widgets/namaj_time_card.dart';
-import '../models/namaj_time_model.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -19,6 +19,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  late bool isAdmin = false;
+
   final DatabaseReference _database = FirebaseDatabase.instance.ref();
   IconData notifyIcon = Icons.notifications;
   bool status = false;
@@ -86,12 +88,11 @@ class _HomePageState extends State<HomePage> {
     Timer.periodic(const Duration(seconds: 1), (timer) async {
       final currentTime = DateTime.now();
 
-      if ("${reduceTime(namajData[prayerTimes.currentPrayer().name])}:01" ==
+      if ("${reduceTime(namajData[prayerTimes.currentPrayer().name] ?? "")}:01" ==
           DateFormat('h:mm:ss').format(currentTime)) {
         await AwesomeNotifications().createNotification(
             content: NotificationContent(
                 id: -1,
-                // -1 is replaced by a random number
                 channelKey: 'alerts',
                 title:
                     "It's ${prayerTimes.nextPrayer().name.toUpperCase()} Time",
@@ -133,6 +134,9 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    final storage = GetStorage();
+    isAdmin = storage.read("loggedIn") ?? false;
+
     _determinePosition();
     fetchData();
 
@@ -238,6 +242,7 @@ class _HomePageState extends State<HomePage> {
     DateTime now = DateTime.now();
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
         drawer: Drawer(
           width: MAX_WIDTH * 0.6,
           child: ListView(
@@ -346,7 +351,7 @@ class _HomePageState extends State<HomePage> {
                       maxLines: 2,
                       style: TextStyle(
                           color: Theme.of(context).primaryColor,
-                          fontSize: MAX_WIDTH * 0.1,
+                          fontSize: MAX_WIDTH * 0.15,
                           fontWeight: FontWeight.bold),
                     ),
                     Text(
@@ -354,7 +359,7 @@ class _HomePageState extends State<HomePage> {
                       maxLines: 2,
                       style: TextStyle(
                         color: Theme.of(context).primaryColor,
-                        fontSize: MAX_WIDTH * 0.1,
+                        fontSize: MAX_WIDTH * 0.15,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -363,7 +368,7 @@ class _HomePageState extends State<HomePage> {
                       maxLines: 2,
                       style: TextStyle(
                         color: Theme.of(context).primaryColor,
-                        fontSize: MAX_WIDTH * 0.1,
+                        fontSize: MAX_WIDTH * 0.15,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
