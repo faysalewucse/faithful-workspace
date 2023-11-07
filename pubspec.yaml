@@ -5,7 +5,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.1.0 <4.0.0'
+  sdk: '>=3.0.6 <4.0.0'
 
 dependencies:
   flutter:
@@ -25,7 +25,6 @@ dependencies:
   firebase_core: ^2.15.1
   firebase_messaging: ^14.6.7
   firebase_database: ^10.2.5
-  get: ^4.6.6
   awesome_notifications: ^0.7.7
   wave: ^0.2.2
 
